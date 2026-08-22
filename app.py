@@ -4,10 +4,11 @@ import pandas as pd
 import numpy as np
 import pickle
 import datetime
+import joblib
 
 @st.cache_resource
 def load_artifacts():
-    with open("model.pkl", "rb") as f: model = pickle.load(f)
+    model=joblib.load("model.pkl")
     with open("encoder.pkl", "rb") as f: encoder = pickle.load(f)
     with open("feature_columns.pkl", "rb") as f: feature_columns = pickle.load(f)
     with open("categorical_features.pkl", "rb") as f: categorical_features = pickle.load(f)
