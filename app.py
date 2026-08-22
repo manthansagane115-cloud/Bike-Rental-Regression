@@ -66,7 +66,8 @@ if st.button("Predict Rentals"):
     row['temp_difference'] = row['atemp'] - row['temp']
     row['comfort_index'] = row['temp'] * (1 - row['hum'])
 
-   row[categorical_features] = row[categorical_features].astype(str)
+
+    row[categorical_features] = row[categorical_features].astype(str)
     cat = encoder.transform(row[categorical_features])
     cat = pd.DataFrame(cat, columns=encoder.get_feature_names_out(categorical_features))
     num = row[numerical_features].reset_index(drop=True)
