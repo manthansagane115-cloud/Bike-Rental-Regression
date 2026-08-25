@@ -1,9 +1,8 @@
-
-
-
 import streamlit as st
 import pandas as pd
+import numpy as np
 import joblib
+from datetime import date
 
 st.set_page_config(
     page_title="Bike Rental Demand Prediction",
@@ -11,21 +10,143 @@ st.set_page_config(
     layout="centered"
 )
 
-@st.cache_resource
-def load_artifacts():
-    model = joblib.load("bike_demand_xgb_model.pkl")
-    encoders = joblib.load("bike_demand_label_encoders.pkl")
-    features = joblib.load("bike_demand_features.pkl")
-    return model, encoders, features
+MODEL_FILE = "model.pkl"
 
+
+@st.cache_resource
+def load_model():
+    return joblib.load(MODEL_FILE)
+
+
+# Feature columns used when the Random Forest was trained.
+FEATURE_COLUMNS = [
+    "yr", "mnth", "hr", "weekday", "temp", "atemp", "hum", "windspeed",
+    "day", "weekofyear", "is_weekend", "rush_hour",
+    "hr_sin", "hr_cos", "month_sin", "month_cos",
+    "weekday_sin", "weekday_cos", "temp_difference", "comfort_index",
+    "season_fall", "season_springer", "season_summer", "season_winter",
+    "holiday_No", "holiday_Yes",
+    "workingday_No work", "workingday_Working Day",
+    "weathersit_Clear", "weathersit_Heavy Rain",
+    "weathersit_Light Snow", "weathersit_Mist",
+    "time_of_day_Afternoon", "time_of_day_Evening",
+    "time_of_day_Morning", "time_of_day_Night"
+]
+
+
+def time_of_day(hour):
+    if hour < 6:
+        return "Night"
+    elif hour < 12:
+        return "Morning"
+    elif hour < 17:
+        return "Afternoon"
+    elif hour < 21:
+        return "Evening"
+    else:
+        return "Night"
+
+
+def normalize_season(value):
+    mapping = {
+        "spring": "springer",
+        "springer": "springer",
+        "summer": "summer",
+        "fall": "fall",
+        "autumn": "fall",
+        "winter": "winter"
+    }
+    return mapping[str(value).lower()]
+
+
+def normalize_weather(value):
+    mapping = {
+        "clear": "Clear",
+        "mist": "Mist",
+        "light snow": "Light Snow",
+        "heavy rain": "Heavy Rain"
+    }
+    return mapping[str(value).lower()]
+
+
+def build_features(year, month, hour, weekday, season, holiday,
+                   workingday, weather, temp, atemp, hum, windspeed,
+                   selected_date):
+    row = {}
+
+    # Numerical features exactly as used during training.
+    row["yr"] = float(year)
+    row["mnth"] = int(month)
+    row["hr"] = int(hour)
+    row["weekday"] = int(weekday)
+    row["temp"] = float(temp)
+    row["atemp"] = float(atemp)
+    row["hum"] = float(hum)
+    row["windspeed"] = float(windspeed)
+
+    # Date-based features.
+    dt = pd.Timestamp(selected_date)
+    row["day"] = int(dt.day)
+    row["weekofyear"] = int(dt.isocalendar().week)
+
+    # Engineered features.
+    row["is_weekend"] = int(weekday in [0, 6])
+    row["rush_hour"] = int(hour in [7, 8, 9, 17, 18, 19])
+
+    row["hr_sin"] = np.sin(2 * np.pi * hour / 24)
+    row["hr_cos"] = np.cos(2 * np.pi * hour / 24)
+
+    row["month_sin"] = np.sin(2 * np.pi * month / 12)
+    row["month_cos"] = np.cos(2 * np.pi * month / 12)
+
+    row["weekday_sin"] = np.sin(2 * np.pi * weekday / 7)
+    row["weekday_cos"] = np.cos(2 * np.pi * weekday / 7)
+
+    row["temp_difference"] = atemp - temp
+    row["comfort_index"] = temp * (1 - hum)
+
+    # One-hot encoded categorical features.
+    season = normalize_season(season)
+    weather = normalize_weather(weather)
+    holiday = str(holiday)
+    workingday = str(workingday)
+    tod = time_of_day(hour)
+
+    row["season_fall"] = int(season == "fall")
+    row["season_springer"] = int(season == "springer")
+    row["season_summer"] = int(season == "summer")
+    row["season_winter"] = int(season == "winter")
+
+    row["holiday_No"] = int(holiday == "No")
+    row["holiday_Yes"] = int(holiday == "Yes")
+
+    row["workingday_No work"] = int(workingday == "No work")
+    row["workingday_Working Day"] = int(workingday == "Working Day")
+
+    row["weathersit_Clear"] = int(weather == "Clear")
+    row["weathersit_Heavy Rain"] = int(weather == "Heavy Rain")
+    row["weathersit_Light Snow"] = int(weather == "Light Snow")
+    row["weathersit_Mist"] = int(weather == "Mist")
+
+    row["time_of_day_Afternoon"] = int(tod == "Afternoon")
+    row["time_of_day_Evening"] = int(tod == "Evening")
+    row["time_of_day_Morning"] = int(tod == "Morning")
+    row["time_of_day_Night"] = int(tod == "Night")
+
+    # Guarantee exact training-column order.
+    return pd.DataFrame([row]).reindex(columns=FEATURE_COLUMNS, fill_value=0)
+
+
+# Load model.
 try:
-    model, encoders, features = load_artifacts()
+    model = load_model()
 except FileNotFoundError:
-    st.error(
-        "Model files are missing. Run the final Deployment Preparation cells "
-        "in the notebook first to create the .pkl files."
-    )
+    st.error("model.pkl was not found. Put model.pkl in the same GitHub repository as app.py.")
     st.stop()
+except Exception as e:
+    st.error(f"Could not load model.pkl: {e}")
+    st.stop()
+
 
 st.title("🚲 Bike Rental Demand Prediction")
 st.write(
@@ -38,39 +159,48 @@ st.header("Prediction Inputs")
 col1, col2 = st.columns(2)
 
 with col1:
-    year_label = st.selectbox("Year", ["2011", "2012"])
-    yr = 0 if year_label == "2011" else 1
-
-    mnth = st.slider("Month", 1, 12, 6)
-    hr = st.slider("Hour", 0, 23, 8)
-    weekday = st.slider("Weekday (0=Sunday, 6=Saturday)", 0, 6, 1)
-
-    season_value = st.selectbox(
-        "Season",
-        list(encoders["season"].classes_)
+    selected_date = st.date_input(
+        "Date",
+        value=date(2012, 6, 15),
+        min_value=date(2011, 1, 1),
+        max_value=date(2012, 12, 31)
     )
 
-    holiday_value = st.selectbox(
+    year = selected_date.year
+
+    month = st.slider("Month", 1, 12, selected_date.month)
+    hour = st.slider("Hour", 0, 23, 17)
+    weekday = st.slider(
+        "Weekday (0=Sunday, 6=Saturday)",
+        0, 6, 2
+    )
+
+    season = st.selectbox(
+        "Season",
+        ["springer", "summer", "fall", "winter"]
+    )
+
+    holiday = st.selectbox(
         "Holiday",
-        list(encoders["holiday"].classes_)
+        ["No", "Yes"]
     )
 
 with col2:
-    workingday_value = st.selectbox(
+    workingday = st.selectbox(
         "Working Day",
-        list(encoders["workingday"].classes_)
+        ["Working Day", "No work"]
     )
 
-    weather_value = st.selectbox(
+    weather = st.selectbox(
         "Weather Situation",
-        list(encoders["weathersit"].classes_)
+        ["Clear", "Mist", "Light Snow", "Heavy Rain"]
     )
 
     temp = st.number_input(
         "Temperature (normalized)",
         min_value=0.0,
         max_value=1.0,
-        value=0.5,
+        value=0.60,
         step=0.01
     )
 
@@ -78,7 +208,7 @@ with col2:
         "Feeling Temperature (normalized)",
         min_value=0.0,
         max_value=1.0,
-        value=0.5,
+        value=0.60,
         step=0.01
     )
 
@@ -86,7 +216,7 @@ with col2:
         "Humidity (normalized)",
         min_value=0.0,
         max_value=1.0,
-        value=0.5,
+        value=0.50,
         step=0.01
     )
 
@@ -94,58 +224,52 @@ with col2:
         "Wind Speed (normalized)",
         min_value=0.0,
         max_value=1.0,
-        value=0.2,
+        value=0.20,
         step=0.01
     )
 
-st.subheader("Engineered Features")
-day_of_month = st.slider("Day of Month", 1, 31, 15)
-is_weekend = int(weekday in [0, 6])
-is_rush_hour = int(hr in [7, 8, 9, 17, 18, 19])
-is_night = int(hr >= 22 or hr <= 5)
 
+is_weekend = int(weekday in [0, 6])
+rush_hour = int(hour in [7, 8, 9, 17, 18, 19])
+tod = time_of_day(hour)
+
+st.subheader("Engineered Features")
 st.write(
-    f"Weekend: **{is_weekend}** | "
-    f"Rush hour: **{is_rush_hour}** | "
-    f"Night: **{is_night}**"
+    f"**Time of day:** {tod}  |  "
+    f"**Weekend:** {is_weekend}  |  "
+    f"**Rush hour:** {rush_hour}"
 )
+
 
 if st.button("Predict Bike Demand", type="primary"):
     try:
-        input_data = pd.DataFrame({
-            "season": [season_value],
-            "yr": [yr],
-            "mnth": [mnth],
-            "hr": [hr],
-            "holiday": [holiday_value],
-            "weekday": [weekday],
-            "workingday": [workingday_value],
-            "weathersit": [weather_value],
-            "temp": [temp],
-            "atemp": [atemp],
-            "hum": [hum],
-            "windspeed": [windspeed],
-            "day_of_month": [day_of_month],
-            "is_weekend": [is_weekend],
-            "is_rush_hour": [is_rush_hour],
-            "is_night": [is_night]
-        })
+        input_df = build_features(
+            year=year,
+            month=month,
+            hour=hour,
+            weekday=weekday,
+            season=season,
+            holiday=holiday,
+            workingday=workingday,
+            weather=weather,
+            temp=temp,
+            atemp=atemp,
+            hum=hum,
+            windspeed=windspeed,
+            selected_date=selected_date
+        )
 
-        for col in ["season", "holiday", "workingday", "weathersit"]:
-            input_data[col] = encoders[col].transform(
-                input_data[col].astype(str)
-            )
+        # The notebook trained the model on log1p(cnt).
+        prediction_log = model.predict(input_df)[0]
+        prediction = max(0, round(float(np.expm1(prediction_log))))
 
-        input_data = input_data[features]
-        prediction = float(model.predict(input_data)[0])
-        prediction = max(0, round(prediction))
-
-        st.success(f"🚲 Predicted Bike Demand: **{prediction} bikes**")
+        st.success(f"🚲 Predicted Bike Demand: **{prediction:,} bikes**")
 
         st.info(
-            "This prediction is generated by the tuned XGBoost regression "
-            "model trained in the project notebook."
+            "Prediction generated using the tuned Random Forest regression "
+            "model from the Bike Rental project."
         )
 
     except Exception as e:
         st.error(f"Prediction failed: {e}")
+        st.exception(e)
