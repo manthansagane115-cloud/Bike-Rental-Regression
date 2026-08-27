@@ -210,6 +210,38 @@ st.markdown(
         padding: 2.2rem 2.2rem 2.5rem 2.2rem;
         margin-top: 1.2rem;
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+        color: #111111 !important;
+    }
+
+    .block-container p,
+    .block-container span,
+    .block-container label,
+    .block-container li,
+    .block-container div,
+    .block-container h1,
+    .block-container h2,
+    .block-container h3,
+    .block-container h4,
+    .block-container .stMarkdown,
+    .block-container .stCaption,
+    .block-container .stSlider label,
+    .block-container .stSelectbox label,
+    .block-container .stDateInput label,
+    .block-container [data-testid="stMetricLabel"],
+    .block-container [data-testid="stMetricValue"] {
+        color: #111111 !important;
+    }
+
+    /* Keep the gradient bike title readable — it uses its own gradient fill */
+    .block-container .bike-title {
+        -webkit-text-fill-color: transparent !important;
+    }
+
+    /* Keep button text white since buttons have a dark gradient background */
+    .block-container div.stButton > button,
+    .block-container div.stButton > button p {
+        color: #ffffff !important;
+    } 
     }
 
     .bike-header {
