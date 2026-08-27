@@ -139,11 +139,11 @@ def build_features(year, month, hour, weekday, season, holiday,
 # ---------------------------------------------------------------------
 GEMINI_ENABLED = False
 try:
-    genai.configure(api_key=st.secrets["AQ.Ab8RN6IFbn_I9lhgck0AuBHgTBzswg6x1OGrL-iTM2GzYvGfwA"])
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     GEMINI_ENABLED = True
-except Exception:
-    # No key configured yet (e.g. running locally without secrets.toml).
+except Exception as e:
     GEMINI_ENABLED = False
+    st.caption(f"DEBUG: Gemini secret error → {e}")
 
 
 def get_gemini_suggestion(prediction, inputs: dict) -> str:
