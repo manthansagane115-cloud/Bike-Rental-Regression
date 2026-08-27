@@ -264,11 +264,15 @@ st.markdown(
         box-shadow: 0 6px 18px rgba(17, 75, 95, 0.4);
     }
 
-    div[data-testid="stMetric"] {
+        div[data-testid="stMetric"] {
         background: linear-gradient(135deg, #ecfdf5, #e0f2fe);
         border-radius: 14px;
         padding: 0.8rem;
         box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    }
+    div[data-testid="stMetric"] [data-testid="stMetricLabel"],
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] {
+        color: #111111 !important;
     }
     </style>
     """,
@@ -376,7 +380,7 @@ c3.metric("Rush Hour?", "Yes" if rush_hour else "No")
 if not GEMINI_ENABLED:
     st.caption("ℹ️ Gemini suggestions are disabled — add GEMINI_API_KEY to secrets to enable them.")
 
-predict_clicked = st.button("🚲 Predict Bike Demand", type="primary")
+predict_clicked = st.button("🛵 Predict Bike Demand", type="primary")
 
 if predict_clicked:
     try:
@@ -400,7 +404,7 @@ if predict_clicked:
         prediction_log = model.predict(input_df)[0]
         prediction = max(0, round(float(np.expm1(prediction_log))))
 
-        st.success(f"🚲 Predicted Bike Demand: **{prediction:,} bikes**")
+        st.success(f"🛵 Predicted Bike Demand: **{prediction:,} bikes**")
         st.info(
             "Prediction generated using the tuned Random Forest regression "
             "model from the Bike Rental project."
