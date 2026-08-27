@@ -206,7 +206,7 @@ st.markdown(
 
     .block-container {
             .block-container {
-        background: rgba(20, 20, 20, 0.94);
+        background: Black;
         border-radius: 20px;
         padding: 2.2rem 2.2rem 2.5rem 2.2rem;
         margin-top: 1.2rem;
